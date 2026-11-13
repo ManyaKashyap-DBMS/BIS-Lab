@@ -1,0 +1,153 @@
+import random
+
+random.seed(42)
+
+# Engineering design parameters
+force = 1000
+length = 2
+density = 7850
+young_modulus = 200e9
+
+max_stress = 150e6
+max_deflection = 0.01
+
+# Objective function
+def fitness(wolf):
+    b, h = wolf
+
+    # Calculate beam properties
+    weight = density * length * b * h
+    stress = (6 * force * length) / (b * h**2)
+    deflection = (4 * force * length**3) / (
+        young_modulus * b * h**3
+    )
+
+    # Constraint penalties
+    p1 = max(0, stress / max_stress - 1)
+    p2 = max(0, deflection / max_deflection - 1)
+
+    penalty = 1000000 * (p1**2 + p2**2)
+
+    return weight + penalty
+
+
+# GWO parameters
+n = 40
+iterations = 300
+
+lower = [0.02, 0.02]
+upper = [0.20, 0.30]
+
+# Initialize wolves
+wolves = [
+    [random.uniform(lower[j], upper[j]) for j in range(2)]
+    for i in range(n)
+]
+
+best_wolf = None
+best_score = float('inf')
+
+# Main GWO loop
+for t in range(iterations):
+
+    # Evaluate and rank wolves
+    ranked = sorted(
+        [(fitness(w), w.copy()) for w in wolves],
+        key=lambda x: x[0]
+    )
+
+    alpha = ranked[0][1]
+    beta = ranked[1][1]
+    delta = ranked[2][1]
+
+    if ranked[0][0] < best_score:
+        best_score = ranked[0][0]
+        best_wolf = alpha.copy()
+
+    # Reduce control parameter
+    a = 2 - 2 * t / iterations
+
+    new_wolves = []
+
+    # Update wolf positions
+    for wolf in wolves:
+        new_position = []
+
+        for j in range(2):
+            positions = []
+
+            for leader in [alpha, beta, delta]:
+                r1 = random.random()
+                r2 = random.random()
+
+                A = 2 * a * r1 - a
+                C = 2 * r2
+
+                D = abs(C * leader[j] - wolf[j])
+                X = leader[j] - A * D
+
+                positions.append(X)
+
+            value = sum(positions) / 3
+            value = max(lower[j], min(upper[j], value))
+
+            new_position.append(value)
+
+        new_wolves.append(new_position)
+
+    wolves = new_wolves
+
+# Final optimized dimensions
+b, h = best_wolf
+
+weight = density * length * b * h
+stress = (6 * force * length) / (b * h**2)
+deflection = (4 * force * length**3) / (
+    young_modulus * b * h**3
+)
+
+# Display results
+print("BEAM DESIGN OPTIMIZATION USING GWO")
+print("----------------------------------")
+print("Optimized Beam Dimensions:")
+print("Width:", round(b, 4), "m")
+print("Height:", round(h, 4), "m")
+
+print("\nEngineering Results:")
+print("Beam Weight:", round(weight, 2), "kg")
+print("Bending Stress:", round(stress / 1e6, 2), "MPa")
+print("Deflection:", round(deflection * 1000, 2), "mm")
+
+print("\nDesign Constraints:")
+print("Maximum Allowed Stress:", max_stress / 1e6, "MPa")
+print("Maximum Allowed Deflection:",
+      max_deflection * 1000, "mm")
+
+if stress <= max_stress and deflection <= max_deflection:
+    print("Design Status: SAFE")
+else:
+    print("Design Status: NOT SAFE")
+
+print("\nBest Solution: Alpha Wolf")
+print("Total Iterations:", iterations)
+
+OUTPUT:
+
+BEAM DESIGN OPTIMIZATION USING GWO
+----------------------------------
+Optimized Beam Dimensions:
+Width: 0.02 m
+Height: 0.0928 m
+
+Engineering Results:
+Beam Weight: 29.15 kg
+Bending Stress: 69.62 MPa
+Deflection: 10.0 mm
+
+Design Constraints:
+Maximum Allowed Stress: 150.0 MPa
+Maximum Allowed Deflection: 10.0 mm
+Design Status: SAFE
+
+Best Solution: Alpha Wolf
+Total Iterations: 300
