@@ -1,0 +1,143 @@
+
+import random
+
+random.seed(42)
+
+NS_vehicles = 30
+EW_vehicles = 20
+
+cycle_time = 60
+rows = 5
+cols = 5
+iterations = 100
+mutation_rate = 0.15
+
+min_green = 10
+max_green = 50
+
+def fitness(green_NS):
+    green_EW = cycle_time - green_NS
+
+    delay = (
+        NS_vehicles * (cycle_time - green_NS) ** 2
+        + EW_vehicles * (cycle_time - green_EW) ** 2
+    )
+
+    return -delay
+
+def repair(value):
+    return max(min_green, min(max_green, value))
+
+def get_neighbors(r, c):
+    return [
+        ((r - 1) % rows, c),
+        ((r + 1) % rows, c),
+        (r, (c - 1) % cols),
+        (r, (c + 1) % cols)
+    ]
+
+def update_cell(r, c, old_grid, seed):
+    local_random = random.Random(seed)
+
+    current = old_grid[r][c]
+
+    neighbor_positions = get_neighbors(r, c)
+
+    neighbors = [
+        old_grid[x][y] for x, y in neighbor_positions
+    ]
+
+    best_neighbor = max(neighbors, key=fitness)
+
+    child = (current + best_neighbor) / 2
+
+    if local_random.random() < mutation_rate:
+        child += local_random.uniform(-4, 4)
+
+    child = repair(child)
+
+    candidates = [current, best_neighbor, child]
+
+    return max(candidates, key=fitness)
+
+grid = [
+    [
+        random.uniform(min_green, max_green)
+        for c in range(cols)
+    ]
+    for r in range(rows)
+]
+
+best_solution = max(
+    [cell for row in grid for cell in row],
+    key=fitness
+)
+
+for generation in range(iterations):
+
+    old_grid = [row[:] for row in grid]
+
+    updated_grid = []
+
+    for r in range(rows):
+        new_row = []
+
+        for c in range(cols):
+
+            seed = random.randint(1, 1000000)
+
+            new_cell = update_cell(
+                r, c, old_grid, seed
+            )
+
+            new_row.append(new_cell)
+
+        updated_grid.append(new_row)
+
+    grid = updated_grid
+
+    current_best = max(
+        [cell for row in grid for cell in row],
+        key=fitness
+    )
+
+    if fitness(current_best) > fitness(best_solution):
+        best_solution = current_best
+
+green_NS = best_solution
+green_EW = cycle_time - green_NS
+
+print("\nTRAFFIC SIGNAL OPTIMIZATION")
+print("----------------------------")
+
+print("North-South Vehicles:", NS_vehicles)
+print("East-West Vehicles:", EW_vehicles)
+
+print("\nOPTIMIZED SIGNAL TIMINGS")
+
+print("North-South Green Time:", round(green_NS, 2), "seconds")
+print("East-West Green Time:", round(green_EW, 2), "seconds")
+
+print("\nTotal Signal Cycle:", cycle_time, "seconds")
+
+print("Estimated Delay Score:", round(-fitness(green_NS), 2))
+
+print("Total Iterations:", iterations)
+print("Number of Cells:", rows * cols)
+
+OUTPUT:
+
+
+TRAFFIC SIGNAL OPTIMIZATION
+----------------------------
+North-South Vehicles: 30
+East-West Vehicles: 20
+
+OPTIMIZED SIGNAL TIMINGS
+North-South Green Time: 36.0 seconds
+East-West Green Time: 24.0 seconds
+
+Total Signal Cycle: 60 seconds
+Estimated Delay Score: 43200.0
+Total Iterations: 100
+Number of Cells: 25
