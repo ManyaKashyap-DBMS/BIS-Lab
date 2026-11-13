@@ -1,0 +1,102 @@
+
+import random
+
+items = ["Book", "Laptop", "Headphones", "Camera", "Water Bottle"]
+weights = [2, 3, 1, 4, 2]
+values = [12, 20, 8, 25, 10]
+
+capacity = 10
+population_size = 6
+generations = 20
+mutation_rate = 0.1
+
+def fitness(chromosome):
+    total_weight = sum(chromosome[i] * weights[i] for i in range(len(items)))
+    total_value = sum(chromosome[i] * values[i] for i in range(len(items)))
+
+    if total_weight > capacity:
+        return 0
+
+    return total_value
+
+def create_chromosome():
+    return [random.randint(0, 1) for _ in range(len(items))]
+
+def selection(population):
+    tournament = random.sample(population, 3)
+    return max(tournament, key=fitness)
+
+def crossover(parent1, parent2):
+    point = random.randint(1, len(items) - 1)
+
+    child1 = parent1[:point] + parent2[point:]
+    child2 = parent2[:point] + parent1[point:]
+
+    return child1, child2
+
+def mutation(chromosome):
+    for i in range(len(chromosome)):
+        if random.random() < mutation_rate:
+            chromosome[i] = 1 - chromosome[i]
+
+    return chromosome
+
+population = [create_chromosome() for _ in range(population_size)]
+
+for generation in range(generations):
+
+    new_population = []
+
+    while len(new_population) < population_size:
+
+        parent1 = selection(population)
+        parent2 = selection(population)
+
+        child1, child2 = crossover(parent1, parent2)
+
+        child1 = mutation(child1)
+        child2 = mutation(child2)
+
+        new_population.append(child1)
+
+        if len(new_population) < population_size:
+            new_population.append(child2)
+
+    population = new_population
+
+best = max(population, key=fitness)
+
+total_weight = sum(best[i] * weights[i] for i in range(len(items)))
+total_value = fitness(best)
+
+print("\nGENETIC ALGORITHM - KNAPSACK PROBLEM")
+print("-------------------------------------")
+
+print("Best Chromosome:", best)
+
+print("\nSelected Items:")
+
+for i in range(len(items)):
+    if best[i] == 1:
+        print(items[i], "-", weights[i], "kg,", values[i], "points")
+
+print("\nTotal Weight:", total_weight, "kg")
+print("Total Value:", total_value, "points")
+print("Knapsack Capacity:", capacity, "kg")
+
+
+OUTPUT:
+
+GENETIC ALGORITHM - KNAPSACK PROBLEM
+-------------------------------------
+Best Chromosome: [1, 1, 1, 1, 0]
+
+Selected Items:
+Book - 2 kg, 12 points
+Laptop - 3 kg, 20 points
+Headphones - 1 kg, 8 points
+Camera - 4 kg, 25 points
+
+Total Weight: 10 kg
+Total Value: 65 points
+Knapsack Capacity: 10 kg
