@@ -1,0 +1,142 @@
+import numpy as np
+
+# ==========================================
+# 1) Problem Parameters & Inputs
+# ==========================================
+subjects = ['Maths', 'Physics', 'Chemistry', 'CSE', 'English']
+difficulty = [5, 4, 3, 4, 2] # Scale: 1 = low, 5 = high[span_0](start_span)[span_0](end_span)
+priority = [5, 4, 3, 5, 2] # Scale: 1 = low, 5 = high[span_1](start_span)[span_1](end_span)
+
+# CSA Configuration Parameters from Notebook
+num_subjects = 5 #[span_2](start_span)[span_2](end_span)
+max_study_hours = 6.0 #[span_3](start_span)[span_3](end_span) Max study time per day
+pop_size = 25 #[span_4](start_span)[span_4](end_span) Population size (n) / number of nests
+max_iter = 100 #[span_5](start_span)[span_5](end_span) Stopping condition (maximum iterations)
+pa = 0.25 #[span_6](start_span)[span_6](end_span) Discovery probability of abandoning poor nests
+alpha = 0.5 #[span_7](start_span)[span_7](end_span) Step size scaling factor
+min_study_time = 0.5 #[span_8](start_span)[span_8](end_span) Min allocation per subject
+max_study_time = 1.5 #[span_9](start_span)[span_9](end_span) Max allocation per subject
+
+# ==========================================
+# 2) Objective / Fitness Function
+# ==========================================
+def objective_function(allocation):
+    """
+    Fitness function to minimize.
+    We want to allocate more hours to subjects with higher difficulty & priority,
+    while ensuring total hours do not exceed max_study_hours and individual
+    bounds are respected.
+    """
+    total_time = np.sum(allocation)
+   
+    # Penalty if total hours deviate from max_study_hours or bounds
+    penalty = 0
+    if abs(total_time - max_study_hours) > 1e-4:
+        penalty += abs(total_time - max_study_hours) * 100
+       
+    for val in allocation:
+        if val < min_study_time or val > max_study_time:
+            penalty += 50
+           
+    # Reward/Cost balancing difficulty and priority
+    # Higher difficulty & priority should ideally receive more time
+    score = 0
+    for i in range(num_subjects):
+        weight = (difficulty[i] + priority[i]) / 2.0
+        # Minimize difference inversely proportional to weight
+        score += abs(weight - allocation[i] * 3)
+       
+    return score + penalty
+
+# ==========================================
+# 3) Cuckoo Search Algorithm Implementation
+# ==========================================
+def get_cuckoo_step(alpha):
+    # Levy flight approximation using Gaussian normal distributions
+    sigma = 1.0
+    u = np.random.randn() * sigma
+    v = np.random.randn()
+    step = alpha * u / (abs(v)**(1/1.5) + 1e-8)
+    return step
+
+def initialize_nests(pop_size, num_subjects, min_val, max_val, target_sum):
+    nests = np.zeros((pop_size, num_subjects))
+    for i in range(pop_size):
+        # Generate random allocations conforming roughly to bounds
+        raw = np.random.uniform(min_val, max_val, num_subjects)
+        # Normalize to match max_study_hours total budget
+        scaled = raw * (target_sum / np.sum(raw))
+        nests[i] = np.clip(scaled, min_val, max_val)
+    return nests
+
+# Run Optimization
+np.random.seed(42)
+nests = initialize_nests(pop_size, num_subjects, min_study_time, max_study_time, max_study_hours)
+fitness = np.array([objective_function(nest) for nest in nests])
+
+best_idx = np.argmin(fitness)
+best_nest = nests[best_idx].copy()
+best_fitness = fitness[best_idx]
+
+for iteration in range(1, max_iter + 1):
+    # 1. Generate new cuckoos via Lévy flights
+    for i in range(pop_size):
+        new_nest = nests[i] + get_cuckoo_step(alpha) * np.random.randn(num_subjects)
+        new_nest = np.clip(new_nest, min_study_time, max_study_time)
+        # Re-scale to maintain daily total limit
+        new_nest = new_nest * (max_study_hours / np.sum(new_nest))
+        new_nest = np.clip(new_nest, min_study_time, max_study_time)
+       
+        f_new = objective_function(new_nest)
+       
+        # Replace a randomly chosen nest if new one is better
+        j = np.random.randint(0, pop_size)
+        if f_new < fitness[j]:
+            nests[j] = new_nest
+            fitness[j] = f_new
+
+    # 2. Abandon worst nests with probability pa and build new ones
+    num_abandon = int(pa * pop_size)
+    worst_indices = np.argsort(fitness)[-num_abandon:]
+    for idx in worst_indices:
+        nests[idx] = initialize_nests(1, num_subjects, min_study_time, max_study_time, max_study_hours)[0]
+        fitness[idx] = objective_function(nests[idx])
+
+    # Update global best
+    current_best_idx = np.argmin(fitness)
+    if fitness[current_best_idx] < best_fitness:
+        best_fitness = fitness[current_best_idx]
+        best_nest = nests[current_best_idx].copy()
+
+    # Print milestone outputs matching notebook logs
+    if iteration in [20, 40, max_iter]:
+        print(f"Iteration : {iteration} \t Best fitness : {best_fitness:.4f}")
+
+# Final normalization check
+best_nest = best_nest * (max_study_hours / np.sum(best_nest))
+
+# ==========================================
+# 4) Final Output Display
+# ==========================================
+print("\n=== Optimal Study Time Allocation ===")
+for i, subj in enumerate(subjects):
+    print(f"{subj} : {best_nest[i]:.2f} hrs")
+
+print(f"\nTotal study time : {np.sum(best_nest):.1f}")
+print(f"Best fitness value : {best_fitness:.4f}")
+
+OUTPUT:
+
+Iteration : 20 	 Best fitness : 1.0479
+Iteration : 40 	 Best fitness : 0.7893
+Iteration : 100 	 Best fitness : 0.7691
+
+=== Optimal Study Time Allocation ===
+Maths : 1.48 hrs
+Physics : 1.38 hrs
+Chemistry : 1.00 hrs
+CSE : 1.48 hrs
+English : 0.67 hrs
+
+Total study time : 6.0
+Best fitness value : 0.7691
